@@ -39,4 +39,6 @@ parcelable AudioMix {
     boolean allowPrivilegedMediaPlaybackCapture;
     /** Indicates if the caller can capture voice communication output */
     boolean voiceCommunicationCaptureAllowed;
+    /** Indicates the Id of the VirtualDevice this AudioMix was registered for */
+    int mVirtualDeviceId;
 }

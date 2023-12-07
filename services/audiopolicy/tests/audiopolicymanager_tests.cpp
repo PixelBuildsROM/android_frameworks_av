@@ -192,7 +192,8 @@ class AudioPolicyManagerTest : public testing::Test {
             audio_channel_mask_t channelMask,
             int sampleRate,
             audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-            audio_port_handle_t *portId = nullptr);
+            audio_port_handle_t *portId = nullptr,
+            uint32_t *virtualDeviceId = nullptr);
     PatchCountCheck snapshotPatchCount() { return PatchCountCheck(mClient.get()); }
 
     void getAudioPorts(audio_port_type_t type, audio_port_role_t role,
@@ -305,6 +306,7 @@ void AudioPolicyManagerTest::getInputForAttr(
         audio_input_flags_t flags,
         audio_port_handle_t *portId) {
     audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+        uint32_t *virtualDeviceId) {
     audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
     config.sample_rate = sampleRate;
     config.channel_mask = channelMask;
@@ -312,11 +314,12 @@ void AudioPolicyManagerTest::getInputForAttr(
     audio_port_handle_t localPortId;
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
+    if (!virtualDeviceId) virtualDeviceId = 0;
     AudioPolicyInterface::input_type_t inputType;
     AttributionSourceState attributionSource = createAttributionSourceState(/*uid=*/ 0);
     ASSERT_EQ(OK, mManager->getInputForAttr(
-            &attr, &input, riid, session, attributionSource, &config, flags,
-            selectedDeviceId, &inputType, portId));
+            &attr, input, riid, session, attributionSource, &config, flags,
+            selectedDeviceId, &inputType, portId, virtualDeviceId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
 
@@ -1258,6 +1261,54 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, BitPerfectPlayback) {
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                            "", "", AUDIO_FORMAT_LDAC));
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferExactConfigForInput) {
+    const audio_channel_mask_t deviceChannelMask = AUDIO_CHANNEL_IN_3POINT1;
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(deviceChannelMask);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_attributes_t attr = {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+                               AUDIO_SOURCE_VOICE_COMMUNICATION,AUDIO_FLAG_NONE, ""};
+    AudioPolicyInterface::input_type_t inputType;
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    AttributionSourceState attributionSource = createAttributionSourceState(/*uid=*/ 0);
+    audio_config_base_t requestedConfig = {
+            .channel_mask = AUDIO_CHANNEL_IN_STEREO,
+            .format = AUDIO_FORMAT_PCM_16_BIT,
+            .sample_rate = 48000
+    };
+    audio_config_base_t config = requestedConfig;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    uint32_t *virtualDeviceId = 0;
+    ASSERT_EQ(OK, mManager->getInputForAttr(
+            &attr, &input, 1 /*riid*/, AUDIO_SESSION_NONE, attributionSource, &config,
+            AUDIO_INPUT_FLAG_NONE,
+            &selectedDeviceId, &inputType, &portId, virtualDeviceId));
+    ASSERT_NE(AUDIO_PORT_HANDLE_NONE, portId);
+    ASSERT_TRUE(equals(requestedConfig, config));
+
+    attr = {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+            AUDIO_SOURCE_VOICE_COMMUNICATION, AUDIO_FLAG_NONE, ""};
+    requestedConfig.channel_mask = deviceChannelMask;
+    config = requestedConfig;
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    input = AUDIO_PORT_HANDLE_NONE;
+    portId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_EQ(OK, mManager->getInputForAttr(
+            &attr, &input, 1 /*riid*/, AUDIO_SESSION_NONE, attributionSource, &config,
+            AUDIO_INPUT_FLAG_NONE,
+            &selectedDeviceId, &inputType, &portId, virtualDeviceId));
+    ASSERT_NE(AUDIO_PORT_HANDLE_NONE, portId);
+    ASSERT_TRUE(equals(requestedConfig, config));
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
 }
 
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {

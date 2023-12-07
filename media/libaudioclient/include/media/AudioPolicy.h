@@ -127,6 +127,7 @@ public:
     audio_devices_t mDeviceType;
     String8         mDeviceAddress;
     uint32_t        mCbFlags; // flags indicating which callbacks to use, see kCbFlag*
+    uint32_t        mVirtualDeviceId;
     /** Ignore the AUDIO_FLAG_NO_MEDIA_PROJECTION */
     bool            mAllowPrivilegedMediaPlaybackCapture = false;
     /** Indicates if the caller can capture voice communication output */

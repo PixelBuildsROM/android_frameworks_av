@@ -63,6 +63,7 @@ cc_library {
         "audiopolicy-aidl-cpp",
         "audiopolicy-types-aidl-cpp",
         "capture_state_listener-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libaudiofoundation",
         "libaudioclient_aidl_conversion",
         "libaudioutils",
@@ -358,6 +359,7 @@ aidl_interface {
     imports: [
         "android.media.audio.common.types-V2",
         "audioclient-types-aidl",
+        "framework-permission-aidl",
     ],
     backend: {
         cpp: {
