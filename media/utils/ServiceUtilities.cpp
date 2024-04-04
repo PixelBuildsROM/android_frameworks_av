@@ -85,7 +85,7 @@ int32_t getOpForSource(audio_source_t source) {
 }
 
 std::optional<AttributionSourceState> resolveAttributionSource(
-        const AttributionSourceState& callerAttributionSource) {
+        const AttributionSourceState& callerAttributionSource, const uint32_t virtualDeviceId) {
     AttributionSourceState nextAttributionSource = callerAttributionSource;
 
     if (!nextAttributionSource.packageName.has_value()) {
@@ -100,6 +100,7 @@ std::optional<AttributionSourceState> resolveAttributionSource(
             return std::nullopt;
         }
     }
+    nextAttributionSource.deviceId = virtualDeviceId;
 
     AttributionSourceState myAttributionSource;
     myAttributionSource.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
@@ -108,6 +109,7 @@ std::optional<AttributionSourceState> resolveAttributionSource(
     // audioserver to the app ops system
     static sp<BBinder> appOpsToken = sp<BBinder>::make();
     myAttributionSource.token = appOpsToken;
+    myAttributionSource.deviceId = virtualDeviceId;
     myAttributionSource.next.push_back(nextAttributionSource);
 
     return std::optional<AttributionSourceState>{myAttributionSource};
@@ -128,7 +130,7 @@ std::optional<AttributionSourceState> resolveAttributionSource(
     // may open a record track on behalf of a client. Note that pid may be a tid.
     // IMPORTANT: DON'T USE PermissionCache - RUNTIME PERMISSIONS CHANGE.
     std::optional<AttributionSourceState> resolvedAttributionSource =
-            resolveAttributionSource(attributionSource);
+            resolveAttributionSource(attributionSource, virtualDeviceId);
     if (!resolvedAttributionSource.has_value()) {
         return false;
     }
@@ -136,7 +138,6 @@ std::optional<AttributionSourceState> resolveAttributionSource(
     const int32_t attributedOpCode = getOpForSource(source);
 
     permission::PermissionChecker permissionChecker;
-    resolvedAttributionSource.value().deviceId = virtualDeviceId;
     bool permitted = false;
     if (start) {
         permitted = (permissionChecker.checkPermissionForStartDataDeliveryFromDatasource(
@@ -165,13 +166,16 @@ bool recordingAllowed(const AttributionSourceState &attributionSource,
                                   String16(), /*start*/ false, source);
 }
 
-bool startRecording(const AttributionSourceState& attributionSource, const String16& msg,
-        audio_source_t source) {
-    return checkRecordingInternal(attributionSource, DEVICE_ID_DEFAULT, msg, /*start*/ true,
+bool startRecording(const AttributionSourceState& attributionSource,
+                    const uint32_t virtualDeviceId,
+                    const String16& msg,
+                    audio_source_t source) {
+    return checkRecordingInternal(attributionSource, virtualDeviceId, msg, /*start*/ true,
                                   source);
 }
 
-void finishRecording(const AttributionSourceState& attributionSource, audio_source_t source) {
+void finishRecording(const AttributionSourceState &attributionSource, uint32_t virtualDeviceId,
+                     audio_source_t source) {
     // Okay to not track in app ops as audio server is us and if
     // device is rooted security model is considered compromised.
     uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
@@ -181,7 +185,7 @@ void finishRecording(const AttributionSourceState& attributionSource, audio_sour
     // may open a record track on behalf of a client. Note that pid may be a tid.
     // IMPORTANT: DON'T USE PermissionCache - RUNTIME PERMISSIONS CHANGE.
     const std::optional<AttributionSourceState> resolvedAttributionSource =
-            resolveAttributionSource(attributionSource);
+            resolveAttributionSource(attributionSource, virtualDeviceId);
     if (!resolvedAttributionSource.has_value()) {
         return;
     }
@@ -405,7 +409,7 @@ bool mustAnonymizeBluetoothAddress(
         return false;
     }
     const std::optional<AttributionSourceState> resolvedAttributionSource =
-            resolveAttributionSource(attributionSource);
+            resolveAttributionSource(attributionSource, DEVICE_ID_DEFAULT);
     if (!resolvedAttributionSource.has_value()) {
         return true;
     }

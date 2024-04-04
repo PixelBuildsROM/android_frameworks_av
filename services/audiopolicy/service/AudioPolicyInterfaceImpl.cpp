@@ -825,8 +825,8 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 
     // check calling permissions
     if (!isAudioServerOrMediaServerUid(client->attributionSource.uid)
-            && !(startRecording(client->attributionSource, String16(msg.str().c_str()),
-                         client->attributes.source)
+            && !(startRecording(client->attributionSource, client->virtualDeviceId,
+                         String16(msg.str().c_str()), client->attributes.source)
             || client->attributes.source == AUDIO_SOURCE_FM_TUNER
             || client->attributes.source == AUDIO_SOURCE_REMOTE_SUBMIX
             || client->attributes.source == AUDIO_SOURCE_ECHO_REFERENCE)) {
@@ -844,7 +844,8 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
     if (client->active) {
         ALOGE("Client should never be active before startInput. Uid %d port %d",
                 client->attributionSource.uid, portId);
-        finishRecording(client->attributionSource, client->attributes.source);
+        finishRecording(client->attributionSource, client->virtualDeviceId,
+                        client->attributes.source);
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
 
@@ -940,7 +941,8 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
         client->active = false;
         client->startTimeNs = 0;
         updateUidStates_l();
-        finishRecording(client->attributionSource, client->attributes.source);
+        finishRecording(client->attributionSource, client->virtualDeviceId,
+                        client->attributes.source);
     }
 
     return binderStatusFromStatusT(status);
@@ -969,7 +971,7 @@ Status AudioPolicyService::stopInput(int32_t portIdAidl)
     updateUidStates_l();
 
     // finish the recording app op
-    finishRecording(client->attributionSource, client->attributes.source);
+    finishRecording(client->attributionSource, client->virtualDeviceId, client->attributes.source);
     AutoCallerClear acc;
     return binderStatusFromStatusT(mAudioPolicyManager->stopInput(portId));
 }
