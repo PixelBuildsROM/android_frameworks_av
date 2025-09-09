@@ -222,25 +222,6 @@ static void destroyAudioPolicyManager(AudioPolicyInterface *interface)
     delete interface;
 }
 
-namespace {
-int getTargetSdkForPackageName(std::string_view packageName) {
-    const auto binder = defaultServiceManager()->checkService(String16{"package_native"});
-    int targetSdk = -1;
-    if (binder != nullptr) {
-        const auto pm = interface_cast<content::pm::IPackageManagerNative>(binder);
-        if (pm != nullptr) {
-            const auto status = pm->getTargetSdkVersionForPackage(
-                    String16{packageName.data(), packageName.size()}, &targetSdk);
-            return status.isOk() ? targetSdk : -1;
-        }
-    }
-    return targetSdk;
-}
-
-bool doesPackageTargetAtLeastU(std::string_view packageName) {
-    return getTargetSdkForPackageName(packageName) >= __ANDROID_API_U__;
-}
-} // anonymous
 // ----------------------------------------------------------------------------
 
 AudioPolicyService::AudioPolicyService()
