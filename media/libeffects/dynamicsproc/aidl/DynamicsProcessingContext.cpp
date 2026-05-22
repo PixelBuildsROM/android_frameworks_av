@@ -418,8 +418,23 @@ bool DynamicsProcessingContext::validateBandConfig(const std::vector<T>& bands, 
                                                    int maxBand) {
     std::vector<float> freqs(bands.size(), -1);
     for (auto band : bands) {
-        if (!validateChannel(band.channel, maxChannel)) return false;
-        if (!validateBand(band.band, maxBand)) return false;
+        if (!validateChannel(band.channel, maxChannel)) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " invalid, maxCh " << maxChannel;
+            return false;
+        }
+        if (!validateBand(band.band, maxBand)) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " invalid, maxBand " << maxBand;
+            return false;
+        }
+        if (std::find(freqs.begin(), freqs.end(), band.band) != freqs.end()) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " found duplicate";
+            return false;
+        }
+        if (!std::isfinite(band.cutoffFrequencyHz) || band.cutoffFrequencyHz < 0 ||
+            band.cutoffFrequencyHz > (float)mCommon.input.base.sampleRate / 2) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " invalid cutoffFrequencyHz";
+            return false;
+        }
         freqs[band.band] = band.cutoffFrequencyHz;
     }
     if (std::count(freqs.begin(), freqs.end(), -1)) return false;
